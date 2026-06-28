@@ -1,59 +1,132 @@
 import os
-import requests
+import sys
+import json
 from typing import List, Dict, Any, Optional
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+# Add parent directory of 'frontend' to sys.path to ensure 'app' is importable
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Import PNS modules for in-process execution
+from app.models.database import SessionLocal, ConversationHistory, engine, Base
+from app.services.event_analyzer import extract_topics
+from app.services.topic_generator import generate_suggestions
+from app.services.fact_checker import verify_fact_wikipedia
+from app.services.json_storage import log_conversation_to_json, log_feedback_to_json
+
+# Ensure database tables are initialized
+Base.metadata.create_all(bind=engine)
 
 def generate_starters_api(event_description: str, interests: List[str]) -> Optional[Dict[str, Any]]:
-    """Calls FastAPI backend to generate conversation starters."""
-    url = f"{BACKEND_URL}/api/generate-conversation"
-    payload = {
-        "description": event_description,
-        "interests": [i.strip() for i in interests if i.strip()]
-    }
+    """Runs in-process logic to generate conversation starters and log them."""
     try:
-        response = requests.post(url, json=payload, timeout=15)
-        if response.status_code == 200:
-            return response.json()
-        return None
+        interests_list = [i.strip() for i in interests if i.strip()]
+        topics = extract_topics(event_description, interests_list)
+        suggestions = generate_suggestions(event_description, topics, interests_list)
+        
+        # Save to database
+        db = SessionLocal()
+        db_history = ConversationHistory(
+            description=event_description,
+            interests=json.dumps(interests_list),
+            topics=json.dumps(topics),
+            suggestions=json.dumps(suggestions),
+            feedback=None
+        )
+        db.add(db_history)
+        db.commit()
+        db.refresh(db_history)
+        item_id = db_history.id
+        db.close()
+        
+        # Log to JSON
+        log_conversation_to_json(
+            description=event_description,
+            interests=interests_list,
+            topics=topics,
+            suggestions=suggestions,
+            item_id=item_id
+        )
+        
+        return {
+            "id": item_id,
+            "topics": topics,
+            "suggestions": suggestions
+        }
     except Exception as e:
-        print(f"Error calling generate starters API: {e}")
+        print(f"Error during in-process generation: {e}")
         return None
 
 def factcheck_api(query: str) -> Optional[Dict[str, Any]]:
-    """Calls FastAPI backend to verify quick facts using Wikipedia."""
-    url = f"{BACKEND_URL}/api/fact-check"
-    payload = {"query": query}
+    """Runs in-process logic to verify quick facts using Wikipedia."""
     try:
-        response = requests.post(url, json=payload, timeout=12)
-        if response.status_code == 200:
-            return response.json()
-        return None
+        result = verify_fact_wikipedia(query)
+        summary = result["summary"]
+        if result.get("verified") and "source_url" in result:
+            summary += f"\n\nSource Reference: {result['source_url']}"
+        return {"summary": summary}
     except Exception as e:
-        print(f"Error calling factcheck API: {e}")
+        print(f"Error during in-process factcheck: {e}")
         return None
 
 def get_history_api() -> List[Dict[str, Any]]:
-    """Retrieves conversation history logs from the backend."""
-    url = f"{BACKEND_URL}/api/history"
+    """Runs in-process logic to retrieve conversation history logs."""
     try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        return []
+        db = SessionLocal()
+        items = db.query(ConversationHistory).order_by(ConversationHistory.id.desc()).all()
+        db.close()
+        
+        response_items = []
+        for item in items:
+            try:
+                interests_list = json.loads(item.interests)
+            except Exception:
+                interests_list = [x.strip() for x in item.interests.split(",") if x.strip()]
+                
+            try:
+                topics_list = json.loads(item.topics)
+            except Exception:
+                topics_list = [x.strip() for x in item.topics.split(",") if x.strip()]
+                
+            try:
+                suggestions_list = json.loads(item.suggestions)
+            except Exception:
+                suggestions_list = [item.suggestions]
+                
+            created_at_str = item.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+            
+            response_items.append({
+                "id": item.id,
+                "description": item.description,
+                "interests": interests_list,
+                "topics": topics_list,
+                "suggestions": suggestions_list,
+                "feedback": item.feedback,
+                "created_at": created_at_str
+            })
+        return response_items
     except Exception as e:
-        print(f"Error calling get history API: {e}")
+        print(f"Error during in-process get_history: {e}")
         return []
 
 def send_feedback_api(history_id: int, feedback: Optional[bool]) -> Optional[Dict[str, Any]]:
-    """Sends user thumbs-up/down feedback to the backend."""
-    url = f"{BACKEND_URL}/api/history/{history_id}/feedback"
-    payload = {"feedback": feedback}
+    """Runs in-process logic to log thumbs feedback."""
     try:
-        response = requests.patch(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            return response.json()
+        db = SessionLocal()
+        db_item = db.query(ConversationHistory).filter(ConversationHistory.id == history_id).first()
+        if db_item:
+            db_item.feedback = feedback
+            db.commit()
+            db.refresh(db_item)
+            item_id = db_item.id
+            db.close()
+            
+            log_feedback_to_json(history_id, feedback)
+            return {"status": "success", "id": item_id, "feedback": feedback}
+        db.close()
         return None
     except Exception as e:
-        print(f"Error calling send feedback API: {e}")
+        print(f"Error during in-process send_feedback: {e}")
         return None
