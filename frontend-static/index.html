@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personalized Networking Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Settings Control Panel -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo-icon">🤝</span>
+                <h2>PNS Assistant</h2>
+            </div>
+            
+            <div class="connection-status-panel">
+                <h3>System Status</h3>
+                <div class="status-indicator-wrapper">
+                    <span id="status-dot" class="status-dot offline"></span>
+                    <span id="status-text" class="status-text">Checking Connection...</span>
+                </div>
+                <div class="mode-badge" id="mode-badge">DEMO MODE</div>
+            </div>
+
+            <div class="sidebar-settings">
+                <h3>Configuration</h3>
+                <div class="form-group">
+                    <label for="backend-url-input">API Backend URL</label>
+                    <input type="text" id="backend-url-input" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000">
+                </div>
+                <button id="save-settings-btn" class="btn btn-secondary btn-sm">Save & Reconnect</button>
+            </div>
+
+            <div class="sidebar-footer">
+                <p>Personalized Networking Assistant &copy; 2026</p>
+                <span class="version">v1.1.0</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="app-header">
+                <div class="header-title">
+                    <h1>Personalized Networking Assistant</h1>
+                    <p class="subtitle">Smart conversation starters tailored to your events, verified by Wikipedia</p>
+                </div>
+                <div class="connection-banner" id="connection-banner" style="display: none;">
+                    Running in offline Sandbox Demo Mode. Changes are saved locally.
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <nav class="nav-tabs" role="tablist">
+                <button class="tab-link active" data-tab="tab-starters" role="tab" aria-selected="true">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    Smart Starters
+                </button>
+                <button class="tab-link" data-tab="tab-factcheck" role="tab" aria-selected="false">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Fact Verification
+                </button>
+                <button class="tab-link" data-tab="tab-history" role="tab" aria-selected="false">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Strategy Logs
+                </button>
+            </nav>
+
+            <!-- Tab Panels -->
+            <section class="tab-panels">
+                
+                <!-- TAB 1: Smart Starters -->
+                <div id="tab-starters" class="tab-panel active" role="tabpanel">
+                    <div class="panel-layout">
+                        <!-- Inputs Panel -->
+                        <div class="card input-card">
+                            <h2>Define Your Parameters</h2>
+                            <p class="section-desc">Provide details about the event and what topics you wish to bridge to.</p>
+                            
+                            <form id="starters-form" onsubmit="return false;">
+                                <div class="form-group">
+                                    <label for="event-desc">Event Description</label>
+                                    <textarea id="event-desc" rows="5" placeholder="Describe the conference topic, theme, panel, or session (e.g. AI for Sustainable Cities. Discussing grid optimization, environmental policy, and green transportation)..." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="interests-input">Your Interests</label>
+                                    <input type="text" id="interests-input" placeholder="e.g. climate change, machine learning, urban transit (comma-separated)" required>
+                                </div>
+
+                                <button type="submit" id="generate-btn" class="btn btn-primary btn-block">
+                                    <span>Generate Starters</span>
+                                    <span class="btn-spinner" id="generate-spinner" style="display: none;"></span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Results Panel -->
+                        <div class="card results-card">
+                            <h2>Tailored Suggestions</h2>
+                            <p class="section-desc">Extracted themes and customized conversation starters will appear below.</p>
+                            
+                            <div id="starters-placeholder" class="results-placeholder">
+                                <div class="placeholder-icon">💡</div>
+                                <p>Fill in the details on the left and click <strong>Generate Starters</strong> to build your custom icebreakers.</p>
+                            </div>
+
+                            <div id="starters-results" class="starters-results" style="display: none;">
+                                <div class="extracted-topics-section">
+                                    <h3>Extracted Topics</h3>
+                                    <div id="extracted-topics-container" class="tags-container">
+                                        <!-- Badges will be generated here -->
+                                    </div>
+                                </div>
+
+                                <div class="suggestions-section">
+                                    <h3>Conversation Starters</h3>
+                                    <div id="suggestions-list" class="suggestions-list">
+                                        <!-- Suggestion cards will be generated here -->
+                                    </div>
+                                </div>
+
+                                <div class="feedback-section" id="generation-feedback-section">
+                                    <p>How do you rate these suggestions?</p>
+                                    <div class="feedback-buttons">
+                                        <button id="feedback-useful-btn" class="btn btn-success btn-outline">
+                                            <span class="btn-icon">👍</span> Useful
+                                        </button>
+                                        <button id="feedback-notuseful-btn" class="btn btn-danger btn-outline">
+                                            <span class="btn-icon">👎</span> Needs Work
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Fact Verification -->
+                <div id="tab-factcheck" class="tab-panel" role="tabpanel">
+                    <div class="card factcheck-card">
+                        <h2>Quick Wikipedia Reference</h2>
+                        <p class="section-desc">Verify a concept, term, or acronym on the fly to prepare for conversations or clarify topics discussed.</p>
+                        
+                        <form id="factcheck-form" onsubmit="return false;" class="search-form">
+                            <div class="form-group flex-grow">
+                                <input type="text" id="factcheck-query" placeholder="e.g. zero shot learning, microgrids, zero-knowledge proofs" required>
+                            </div>
+                            <button type="submit" id="factcheck-btn" class="btn btn-primary">
+                                <span>Verify Fact</span>
+                                <span class="btn-spinner" id="factcheck-spinner" style="display: none;"></span>
+                            </button>
+                        </form>
+
+                        <div id="factcheck-placeholder" class="results-placeholder">
+                            <div class="placeholder-icon">🔍</div>
+                            <p>Enter a term above to retrieve a concise Wikipedia verification summary.</p>
+                        </div>
+
+                        <div id="factcheck-result" class="factcheck-result-card" style="display: none;">
+                            <div class="factcheck-header">
+                                <span class="factcheck-badge">Verified Reference</span>
+                                <h3 id="factcheck-result-title">Topic Title</h3>
+                            </div>
+                            <div class="factcheck-body">
+                                <p id="factcheck-result-text">Summary details...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Strategy Logs (History) -->
+                <div id="tab-history" class="tab-panel" role="tabpanel">
+                    <div class="history-header-actions">
+                        <div>
+                            <h2>Strategy Logs</h2>
+                            <p class="section-desc">Browse through your previously generated starters and review their effectiveness rating.</p>
+                        </div>
+                        <button id="refresh-history-btn" class="btn btn-secondary">
+                            <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path></svg>
+                            Refresh Logs
+                        </button>
+                    </div>
+
+                    <div id="history-container" class="history-list">
+                        <!-- History items will be populated here -->
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast System -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
