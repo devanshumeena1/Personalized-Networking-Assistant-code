@@ -1,5 +1,8 @@
 import streamlit as st
-from utils import generate_starters_api, factcheck_api, get_history_api, send_feedback_api
+try:
+    from frontend.utils import generate_starters_api, factcheck_api, get_history_api, send_feedback_api
+except ImportError:
+    from utils import generate_starters_api, factcheck_api, get_history_api, send_feedback_api
 
 st.set_page_config(
     page_title="NexConnect · Networking Assistant",
